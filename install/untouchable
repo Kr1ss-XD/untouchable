@@ -1,0 +1,24 @@
+#!/bin/bash
+
+
+build() {
+	add_module btrfs
+	add_module overlay
+	add_binary btrfs
+	add_binary btrfsck
+	add_binary blkid
+	add_runscript
+}
+
+help() {
+	cat <<-EOT
+		When trying to boot a writeable snapshot on a btrfs volume, this hook creates
+		a read-only copy to mount it in place, and uses a RAM overlayfs to boot this
+		snapshot.
+		When booted up via an initrd containing this hook effectively behaves like an
+        (immutable) live system.
+	EOT
+}
+
+
+# vim: ts=4 sw=4 noet ft=sh:

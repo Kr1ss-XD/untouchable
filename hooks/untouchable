@@ -1,0 +1,64 @@
+#!/usr/bin/ash
+
+run_hook() {
+	# resolve devices for blkid
+	local current_dev=$(resolve_device "${root}")
+	if [[ $(blkid ${current_dev} -s TYPE -o value) = "btrfs" ]]; then
+		# create a random mountpoint in initramfs root
+		current_snap=$(mktemp -d)
+		mount -t btrfs -o ro,"${rootflags}" "${current_dev}" "${current_snap}"
+		# check if booting on a writeable subvolume
+		if [[ $(btrfs property get "${current_snap}" ro) = "ro=false" ]]; then
+			msg 'Attempting boot on a writeable Btrfs subvolume -> using a new read-only snapshot instead ...'
+			snaproot=$(mktemp -d)
+			mount -t btrfs -o rw,noatime,space_cache,compress-force=zstd:3,subvolid=5 "${current_dev}" "${snaproot}"
+			# clean up older temp snapshots, if any
+			for olddir in ${snaproot}/tmp/*; do
+				msg 'Deleting earlier temporary snapshot at' "${snapshot}/${olddir}"
+				btrfs subvolume delete -c "${snapshot}/${olddir}/@RO"
+				rmdir "${snapshot}/${olddir}"
+			done
+			# create a new random folder in btrfs root subvolume
+			rodir=$(mktemp -d)
+			mkdir -p ${snaproot}${rodir}
+			btrfs subvolume snapshot -r "${current_snap}" "${snaproot}${rodir}/@RO"
+			# clean up
+			umount "${current_snap}"
+			rmdir "${current_snap}"
+			umount "${snaproot}"
+			rmdir "${snaproot}"
+			rootflags="ro,noatime,space_cache,compress-force=zstd:3,subvol=${rodir}/@RO"
+		# if not on read-only subvolume, clean up and continue like normal
+		else
+			umount "${current_snap}"
+			rmdir "${current_snap}"
+		fi
+	fi
+}
+
+run_latehook() {
+	# resolve devices for blkid
+	local current_dev=$(resolve_device "${root}")
+	# run only when booting on a read-only btrfs subvolume
+	if [[ $(blkid "${current_dev}" -s TYPE -o value) = "btrfs" ]] && [[ $(btrfs property get /new_root ro) != "ro=false" ]]; then
+		msg 'Booting on a readonly Btrfs snapshot - creating a RAM overlay ...'
+		local lower_dir=$(mktemp -d -p /)
+		local ram_dir=$(mktemp -d -p /)
+		# move new_root to lower_dir
+		mount --move /new_root ${lower_dir}
+		# meuh !!!  space, you can't test !
+		mount -t tmpfs cowspace ${ram_dir}
+		mkdir -p ${ram_dir}/upper
+		mkdir -p ${ram_dir}/work
+		mount -t overlay -o lowerdir=${lower_dir},upperdir=${ram_dir}/upper,workdir=${ram_dir}/work rootfs /new_root
+		# disable snapper- & btrbk-timers
+		msg 'Disabling btrbk/snapper automatic snapshots for this session ...'
+		for t in snapper-cleanup snapper-timeline snapper-boot btrbk; do
+			[ -L /new_root/etc/systemd/system/timers.target.wants/${t}.timer ] &&
+				rm -vf /new_root/etc/systemd/system/timers.target.wants/${t}.timer
+		done
+	fi
+}
+
+
+# vim: ts=4 sw=4 noet ft=sh:
