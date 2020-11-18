@@ -1,6 +1,14 @@
-# Untouchable
+# <p align="center">Untouchable</p>
 
-###### _Install initcpio hooks to create readonly snapshots during early boot and mount an overlayfs on top._
+###### <p align="center">_Install initcpio hooks to create readonly snapshots during early boot and mount an overlayfs on top._</p>
+
+</br>
+
+### ! CAUTION !
+
+**_Do not blindly install the mkinitcpio hook provided by this repository !_**
+
+This is an ongoing WIP with some missing parts, and above all it's completely untested at this point. **Using this as-is may leave you with an unbootable system.**
 
 </br>
 
