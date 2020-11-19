@@ -1,0 +1,13 @@
+*
+
+!.gitignore
+
+!LICENSE
+!COPYING
+!README.md
+
+!Makefile
+
+!/hooks/
+!/install/
+!*/untouchable
